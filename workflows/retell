@@ -1,0 +1,44 @@
+{
+  "agent_id": "medicare-qual-v4",
+  "voice_id": "11labs-emma",
+  "script": [
+    {
+      "type": "say",
+      "text": "Hi {{name}}, this is Alex from Medicare Help Center. With 2025 plan changes, many are saving $50+ per month. Are you 65 or turning 65 this year?",
+      "pause_after": 1.5
+    },
+    {
+      "type": "wait_for_response",
+      "timeout": 6
+    },
+    {
+      "type": "branch",
+      "condition": "{{response.toLowerCase().includes('yes') || response.includes('65')}}",
+      "true": "transfer",
+      "false": "end"
+    },
+    {
+      "type": "label",
+      "name": "transfer"
+    },
+    {
+      "type": "transfer",
+      "phone_number": "+1888-555-0199",
+      "min_duration": 15,
+      "webhook_url": "https://YOUR_N8N_URL/webhook/toc-callback",
+      "transfer_message": "Connecting you now to a licensed Medicare advisor in your area..."
+    },
+    {
+      "type": "label",
+      "name": "end"
+    },
+    {
+      "type": "say",
+      "text": "Thanks for your time. Have a great day!",
+      "pause_after": 1.0
+    },
+    {
+      "type": "end_call"
+    }
+  ]
+}
