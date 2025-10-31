@@ -1,0 +1,177 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-in",
+        "responseMode": "onReceived"
+      },
+      "name": "1. Webhook (Carrd Form)",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-haiku-20240307",
+        "prompt": "Input: {{ $json }}\nExtract: name, phone, zip, primary_vertical (Finance/Insurance), sub_vertical (exact checkbox), intent 1-10\nReturn JSON only.",
+        "options": {}
+      },
+      "name": "2. AI Qualifier (Claude)",
+      "type": "n8n-nodes-base.openAi",
+      "position": [500, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CRED_ID",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const sub = $json.sub_vertical;\nconst agentMap = {\n  \"Medicare\": \"medicare-qual-v4\",\n  \"Final Expense\": \"final-expense-v1\",\n  \"Debt\": \"debt-relief-v1\",\n  \"Mortgage Refinance\": \"mortgage-refi-v1\",\n  \"Auto-Uninsured\": \"auto-quote-v1\",\n  \"default\": \"medicare-qual-v4\"\n};\nreturn [{ ...$json, agent_id: agentMap[sub] || agentMap.default }];"
+      },
+      "name": "3. Map to Retell Agent",
+      "type": "n8n-nodes-base.function",
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.retellai.com/v1/calls",
+        "method": "POST",
+        "authentication": "headerAuth",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{YOUR_RETELL_API_KEY}}"
+            }
+          ]
+        },
+        "bodyParametersJson": "={\n  \"agent_id\": \"{{ $json.agent_id }}\",\n  \"from_number\": \"+18881234567\",\n  \"to_number\": \"{{ $json.phone }}\",\n  \"metadata\": {\n    \"lead_id\": \"{{ $json.lead_id || $node['1. Webhook (Carrd Form)'].json.id }}\",\n    \"vertical\": \"{{ $json.sub_vertical }}\"\n  }\n}"
+      },
+      "name": "4. Trigger Retell AI Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "toc-callback"
+      },
+      "name": "5. TOC Webhook (Retell)",
+      "type": "n8n-nodes-base.webhook",
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.call_duration }}",
+              "operation": "greaterOrEqual",
+              "value2": 15
+            }
+          ]
+        }
+      },
+      "name": "6. ≥15 sec post-transfer?",
+      "type": "n8n-nodes-base.if",
+      "position": [1500, 250]
+    },
+    {
+      "parameters": {
+        "sheetId": "YOUR_AIRTABLE_BASE_ID",
+        "range": "Payouts!A:D",
+        "valueInputMode": "RAW",
+        "values": [
+          [
+            "={{ $json.metadata.lead_id }}",
+            "={{ $json.metadata.vertical }}",
+            "={{ new Date().toISOString() }}",
+            "=40"
+          ]
+        ]
+      },
+      "name": "7. Log $40 TOC",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [1750, 200],
+      "credentials": {
+        "googleApi": {
+          "id": "YOUR_GOOGLE_CRED_ID",
+          "name": "Google Sheets"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "1. Webhook (Carrd Form)": {
+      "main": [
+        [
+          {
+            "node": "2. AI Qualifier (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. AI Qualifier (Claude)": {
+      "main": [
+        [
+          {
+            "node": "3. Map to Retell Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Map to Retell Agent": {
+      "main": [
+        [
+          {
+            "node": "4. Trigger Retell AI Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Trigger Retell AI Call": {
+      "main": [
+        [
+          {
+            "node": "5. TOC Webhook (Retell)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. TOC Webhook (Retell)": {
+      "main": [
+        [
+          {
+            "node": "6. ≥15 sec post-transfer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. ≥15 sec post-transfer?": {
+      "main": [
+        [
+          {
+            "node": "7. Log $40 TOC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "medicare-finance-retell-automation"
+}
