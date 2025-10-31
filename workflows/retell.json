@@ -1,5 +1,5 @@
 {
-  "agent_id": "medicare-qual-v4",
+  "agent_id": "medicare-qual-v5",
   "voice_id": "11labs-emma",
   "script": [
     {
@@ -13,7 +13,7 @@
     },
     {
       "type": "branch",
-      "condition": "{{response.toLowerCase().includes('yes') || response.includes('65')}}",
+      "condition": "response.toLowerCase().includes('yes') || response.includes('65')",
       "true": "transfer",
       "false": "end"
     },
@@ -23,7 +23,7 @@
     },
     {
       "type": "transfer",
-      "phone_number": "+1888-555-0199",
+      "phone_number": "+18885550199",
       "min_duration": 15,
       "webhook_url": "https://YOUR_N8N_URL/webhook/toc-callback",
       "transfer_message": "Connecting you now to a licensed Medicare advisor in your area..."
@@ -35,7 +35,7 @@
     {
       "type": "say",
       "text": "Thanks for your time. Have a great day!",
-      "pause_after": 1.0
+      "pause_after": 1
     },
     {
       "type": "end_call"
